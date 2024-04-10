@@ -15,3 +15,16 @@ def receive_messages(secure_socket):
             print(f"Disconnected from server: {e}")
             secure_socket.close()
             sys.exit()
+
+def main():
+    host = 'localhost'
+    port = 12345
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+    
+    secure_socket = context.wrap_socket(client_socket, server_hostname=host)
+    
