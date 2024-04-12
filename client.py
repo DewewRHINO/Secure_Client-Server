@@ -27,4 +27,25 @@ def main():
     context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
     
     secure_socket = context.wrap_socket(client_socket, server_hostname=host)
+
+    try:
+        secure_socket.connect((host, port))
+    except Exception as e:
+        print(f"Error connecting to server: {e}")
+        sys.exit()
     
+    print("Connected to the chat server. You can start sending messages.")
+
+    threading.Thread(target=receive_messages, args=(secure_socket,)).start()
+
+    try:
+        while True:
+            message = input()
+            if message:
+                secure_socket.send(message.encode('utf-8'))
+    except KeyboardInterrupt:
+        print("Client exiting gracefully.")
+        secure_socket.close()
+
+if __name__ == "__main__":
+    main()
