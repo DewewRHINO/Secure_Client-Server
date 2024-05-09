@@ -2,35 +2,57 @@ import socket
 import ssl
 import threading
 
-def broadcast_messages(client_message, all_clients, sender_socket):
-    for client_socket in all_clients:
-        if client_socket is not sender_socket:
+# Server configuration
+HOST = '192.168.56.1'
+PORT = 12345
+BACKLOG = 10
+
+# SSL context creation
+context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+
+# Shared data
+clients = []
+
+# Function to handle client messages
+def handle_client(client_socket):
+    while True:
+        try:
+            data = client_socket.recv(1024)
+            if not data:
+                break
+            message = data.decode()
+            print(f"Received message: {message}")
+            broadcast(message, client_socket)
+        except ssl.SSLError as e:
+            print(f"SSL error: {e}")
+            break
+
+# Function to broadcast messages to all clients
+def broadcast(message, sender):
+    for client in clients:
+        if client != sender:
             try:
-                client_socket.send(client_message)
-            except Exception as e:
-                print(f"Error broadcasting message: {e}")
-                close_client_connection(client_socket, all_clients)
+                client.sendall(message.encode())
+            except ssl.SSLError as e:
+                print(f"SSL error: {e}")
+                clients.remove(client)
 
-def close_client_connection(client_socket, all_clients):
-    if client_socket in all_clients:
-        all_clients.remove(client_socket)
-    client_socket.close()
+# Main server code
+def main():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen(BACKLOG)
+        print(f"Server listening on {HOST}:{PORT}")
 
-def client_thread(client_socket, all_clients):
-    try:
-        client_socket.send(b'Welcome to the chat room!\n')
-        while True:
-            message = client_socket.recv(2048)
-            if message:
-                print(f"Broadcasting message: {message.decode('utf-8').strip()}")
-                broadcast_messages(message, all_clients, client_socket)
-            else:
-                raise Exception("Client disconnected")
-    except Exception as e:
-        print(f"Client disconnected: {e}")
-    finally:
-        close_client_connection(client_socket, all_clients)
+        with context.wrap_socket(server_socket, server_side=True) as ssl_socket:
+            while True:
+                client_socket, address = ssl_socket.accept()
+                print(f"Connected to {address}")
+                clients.append(client_socket)
 
+                # Start a new thread for each client
+                threading.Thread(target=handle_client, args=(client_socket,), daemon=True).start()
 
-
-
+if __name__ == "__main__":
+    main()
