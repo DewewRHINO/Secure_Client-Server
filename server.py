@@ -1,58 +1,87 @@
 import socket
-import ssl
 import threading
+import ssl
+from termcolor import colored
+import random
 
-# Server configuration
-HOST = '192.168.56.1'
-PORT = 12345
-BACKLOG = 10
+clients = {}
+user_colors = {}  # Dictionary to hold username-color mappings
+available_colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan']  # Removed 'white'
 
-# SSL context creation
-context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+def assign_color():
+    """ Assigns a unique color to each new user. """
+    if not available_colors:
+        raise Exception("No more colors available")  # Handle case where more users than colors exist
+    color = random.choice(available_colors)
+    available_colors.remove(color)  # Remove the color from available pool to ensure uniqueness
+    return color
 
-# Shared data
-clients = []
+def release_color(color):
+    """ Releases a color back to the available pool when a user leaves. """
+    available_colors.append(color)
 
-# Function to handle client messages
-def handle_client(client_socket):
-    while True:
-        try:
-            data = client_socket.recv(1024)
-            if not data:
-                break
-            message = data.decode()
-            print(f"Received message: {message}")
-            broadcast(message, client_socket)
-        except ssl.SSLError as e:
-            print(f"SSL error: {e}")
-            break
-
-# Function to broadcast messages to all clients
-def broadcast(message, sender):
+def broadcast(message):
+    """ Broadcasts a message to all clients. """
     for client in clients:
-        if client != sender:
-            try:
-                client.sendall(message.encode())
-            except ssl.SSLError as e:
-                print(f"SSL error: {e}")
-                clients.remove(client)
+        try:
+            client.send(message)
+        except Exception as e:
+            print(colored(f"Failed to send message to {clients[client]}: {e}", "red"))
 
-# Main server code
-def main():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.bind((HOST, PORT))
-        server_socket.listen(BACKLOG)
-        print(f"Server listening on {HOST}:{PORT}")
+def handle_client(client_socket, address):
+    try:
+        username = client_socket.recv(1024).decode('utf-8').strip()
+        if username in clients.values():
+            client_socket.send("This username is already taken. Please try another one.".encode('utf-8'))
+            client_socket.close()
+            return
+        color = assign_color()
+        user_colors[client_socket] = color
+        clients[client_socket] = username
+        print(colored(f"{username} has joined the chat.", color))
 
-        with context.wrap_socket(server_socket, server_side=True) as ssl_socket:
-            while True:
-                client_socket, address = ssl_socket.accept()
-                print(f"Connected to {address}")
-                clients.append(client_socket)
+        welcome_message = colored(f"{username} has joined the chat!", color).encode('utf-8')
+        broadcast(welcome_message)
 
-                # Start a new thread for each client
-                threading.Thread(target=handle_client, args=(client_socket,), daemon=True).start()
+        while True:
+            message = client_socket.recv(1024)
+            if message:
+                # Do not append the username here, as it's already included by the client.
+                formatted_message = colored(f"{message.decode('utf-8')}", color).encode('utf-8')
+                broadcast(formatted_message)
+            else:
+                break
+    except Exception as e:
+        print(colored(f"Error with client {address}: {e}", "red"))
+    finally:
+        if client_socket in clients:
+            leave_message = colored(f"{username} has left the chat.", color).encode('utf-8')
+            broadcast(leave_message)
+            print(colored(f"{username} connection closed.", "cyan"))
+            release_color(user_colors[client_socket])  # Release the color back to the pool
+            del user_colors[client_socket]
+            del clients[client_socket]
+            client_socket.close()
+
+def setup_server():
+    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context.load_cert_chain(certfile='resources/server.crt', keyfile='resources/server.key')
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind(('127.0.0.1', 55656))
+    server_socket.listen()
+    return server_socket, context
+
+def server_main():
+    server_socket, ssl_context = setup_server()
+    try:
+        while True:
+            client_socket, addr = server_socket.accept()
+            client_socket = ssl_context.wrap_socket(client_socket, server_side=True)
+            threading.Thread(target=handle_client, args=(client_socket, addr)).start()
+    except Exception as e:
+        print(colored(f"Server error: {e}", "red"))
+    finally:
+        server_socket.close()
 
 if __name__ == "__main__":
-    main()
+    server_main()
