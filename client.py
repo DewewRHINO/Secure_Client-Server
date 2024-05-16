@@ -20,9 +20,9 @@ def get_user():
 
 def set_connection():
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile='resources/server.crt')
-    context.load_cert_chain(certfile='resources/client.crt', keyfile='resources/client.key')
+    context.load_cert_chain(certfile='client.crt', keyfile='client.key')
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client = context.wrap_socket(client_socket, server_side=False, server_hostname='example.com')
+    client = context.wrap_socket(client_socket, server_side=False, server_hostname='chet.com')
     client.connect(('127.0.0.1', 55656))
     return client
 

@@ -66,7 +66,7 @@ def set_client(client_socket, address):
 def set_server():
     # Sets up the server socket and SSL context
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    context.load_cert_chain(certfile='resources/server.crt', keyfile='resources/server.key')
+    context.load_cert_chain(certfile='server.crt', keyfile='server.key')
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind(('127.0.0.1', 55656))
     server_socket.listen()
