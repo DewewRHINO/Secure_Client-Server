@@ -4,51 +4,51 @@ import ssl
 from termcolor import colored
 import random
 
-clients = {}
-user_colors = {}  # Dictionary to hold username-color mappings
-available_colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan']  # Removed 'white'
+clients = {}  # Dictionary to hold connected clients and their sockets
+user_colors = {}  # Dictionary to hold user-color mappings
+usable_colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan']  # List of available colors
 
-def assign_color():
-    """ Assigns a unique color to each new user. """
-    if not available_colors:
-        raise Exception("No more colors available")  # Handle case where more users than colors exist
-    color = random.choice(available_colors)
-    available_colors.remove(color)  # Remove the color from available pool to ensure uniqueness
+def set_color():
+    # sets a silly color for those who join in 
+    if not usable_colors:
+        raise Exception("No more colors available")
+    color = random.choice(usable_colors)  # Randomly select a color
+    usable_colors.remove(color)  # Remove the color from the available list
     return color
 
-def release_color(color):
-    """ Releases a color back to the available pool when a user leaves. """
-    available_colors.append(color)
+def remove_color(color):
+    """ Removes a color back to the list when not being used """
+    usable_colors.append(color)  # Add the color back to the available list
 
-def broadcast(message):
-    """ Broadcasts a message to all clients. """
-    for client in clients:
+def show(message):
+    # shows a message to its connected clients
+    for client_socket in list(clients.keys()):  # Iterate over a copy of the keys to avoid modification during iteration
         try:
-            client.send(message)
+            client_socket.send(message)
         except Exception as e:
-            print(colored(f"Failed to send message to {clients[client]}: {e}", "red"))
+            print(colored(f"Failed to send message to {clients[client_socket]}: {e}", "red"))
 
-def handle_client(client_socket, address):
+def set_client(client_socket, address):
+    # sets up communications with a client
     try:
-        username = client_socket.recv(1024).decode('utf-8').strip()
+        username = client_socket.recv(1024).decode('utf-8').strip()  # Receive username from client
         if username in clients.values():
             client_socket.send("This username is already taken. Please try another one.".encode('utf-8'))
             client_socket.close()
             return
-        color = assign_color()
-        user_colors[client_socket] = color
-        clients[client_socket] = username
+        color = set_color()  # Assign a color to the user
+        user_colors[client_socket] = color  # Map the user to their color
+        clients[client_socket] = username  # Add the client to the dictionary of connected clients
         print(colored(f"{username} has joined the chat.", color))
 
         welcome_message = colored(f"{username} has joined the chat!", color).encode('utf-8')
-        broadcast(welcome_message)
+        show(welcome_message)  # Broadcast a welcome message to all clients
 
         while True:
-            message = client_socket.recv(1024)
+            message = client_socket.recv(1024)  # Receive message from client
             if message:
-                # Do not append the username here, as it's already included by the client.
-                formatted_message = colored(f"{message.decode('utf-8')}", color).encode('utf-8')
-                broadcast(formatted_message)
+                formatted_message = colored(f"{username}: {message.decode('utf-8')}", user_colors[client_socket]).encode('utf-8')
+                show(formatted_message)  # Broadcast the message to all clients
             else:
                 break
     except Exception as e:
@@ -56,14 +56,15 @@ def handle_client(client_socket, address):
     finally:
         if client_socket in clients:
             leave_message = colored(f"{username} has left the chat.", color).encode('utf-8')
-            broadcast(leave_message)
+            show(leave_message)  # Broadcast a leave message to all clients
             print(colored(f"{username} connection closed.", "cyan"))
-            release_color(user_colors[client_socket])  # Release the color back to the pool
-            del user_colors[client_socket]
-            del clients[client_socket]
-            client_socket.close()
+            remove_color(user_colors[client_socket])  # Release the color back to the available list
+            del user_colors[client_socket]  # Remove user-color mapping
+            del clients[client_socket]  # Remove client from connected clients
+            client_socket.close()  # Close the client socket
 
-def setup_server():
+def set_server():
+    # Sets up the server socket and SSL context
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     context.load_cert_chain(certfile='resources/server.crt', keyfile='resources/server.key')
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -71,17 +72,17 @@ def setup_server():
     server_socket.listen()
     return server_socket, context
 
-def server_main():
-    server_socket, ssl_context = setup_server()
+def s_main():
+    server_socket, ssl_context = set_server()
     try:
         while True:
             client_socket, addr = server_socket.accept()
             client_socket = ssl_context.wrap_socket(client_socket, server_side=True)
-            threading.Thread(target=handle_client, args=(client_socket, addr)).start()
+            threading.Thread(target=set_client, args=(client_socket, addr)).start()
     except Exception as e:
         print(colored(f"Server error: {e}", "red"))
     finally:
-        server_socket.close()
+        server_socket.close()  
 
 if __name__ == "__main__":
-    server_main()
+    s_main()
