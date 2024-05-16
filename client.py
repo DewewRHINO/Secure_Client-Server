@@ -1,26 +1,24 @@
-import os
 import socket
-import threading
 import ssl
+import threading
 import sys
 from termcolor import colored
 
-def clear_screen():
-    os.system('cls' if os.name == 'nt' else 'clear')
+def clearInstance():
+    print("\033c", end="")  # Clear screen for both Windows and Unix systems
 
-def print_login_menu():
-    clear_screen()
-    print(colored("-----------------------------------------------------", "green"))
+def intro_menu():
+    clearInstance()
+    print(colored("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", "green"))
     print(colored("ʕっ•ᴥ•ʔっ Holay Molay Chat Room", "green"))
-    print(colored("-----------------------------------------------------", "green"))
+    print(colored("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", "green"))
     print("Enter your username to join the chat room:")
 
-def handle_login_menu_input():
-    print_login_menu()
-    username = input("Username: ")
-    return username
+def get_user():
+    intro_menu()
+    return input("Username: ")
 
-def setup_connection():
+def set_connection():
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile='resources/server.crt')
     context.load_cert_chain(certfile='resources/client.crt', keyfile='resources/client.key')
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -46,12 +44,11 @@ def send_messages(client, username, stop_event):
             client.send(f"{username} has left the chat.".encode('utf-8'))
             stop_event.set()
             break
-        # Include the username directly here, rather than repeating it on server-side formatting.
         client.send(f"{username}: {message}".encode('utf-8'))
 
 def main():
-    client = setup_connection()
-    username = handle_login_menu_input()
+    client = set_connection()
+    username = get_user()
 
     try:
         client.send(username.encode('utf-8'))
