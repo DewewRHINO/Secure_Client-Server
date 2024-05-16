@@ -36,19 +36,19 @@ def set_client(client_socket, address):
             client_socket.send("This username is already taken. Please try another one.".encode('utf-8'))
             client_socket.close()
             return
-        color = set_color()  # Assign a color to the user
+        color = set_color()  # set a color to the user
         user_colors[client_socket] = color  # Map the user to their color
         clients[client_socket] = username  # Add the client to the dictionary of connected clients
         print(colored(f"{username} has joined the chat.", color))
 
         welcome_message = colored(f"{username} has joined the chat!", color).encode('utf-8')
-        show(welcome_message)  # Broadcast a welcome message to all clients
+        show(welcome_message)  # show a welcome message to all clients
 
         while True:
             message = client_socket.recv(1024)  # Receive message from client
             if message:
                 formatted_message = colored(f"{username}: {message.decode('utf-8')}", user_colors[client_socket]).encode('utf-8')
-                show(formatted_message)  # Broadcast the message to all clients
+                show(formatted_message)  # show the message to all clients
             else:
                 break
     except Exception as e:
@@ -56,12 +56,12 @@ def set_client(client_socket, address):
     finally:
         if client_socket in clients:
             leave_message = colored(f"{username} has left the chat.", color).encode('utf-8')
-            show(leave_message)  # Broadcast a leave message to all clients
+            show(leave_message)  # show a leave message to all clients
             print(colored(f"{username} connection closed.", "cyan"))
-            remove_color(user_colors[client_socket])  # Release the color back to the available list
-            del user_colors[client_socket]  # Remove user-color mapping
-            del clients[client_socket]  # Remove client from connected clients
-            client_socket.close()  # Close the client socket
+            remove_color(user_colors[client_socket])  
+            del user_colors[client_socket]  
+            del clients[client_socket] 
+            client_socket.close()  
 
 def set_server():
     # Sets up the server socket and SSL context
